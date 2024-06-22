@@ -36,6 +36,9 @@ import {
 } from "react-router";
 import type {
   BrowserHistory,
+  unstable_DataStrategyFunction,
+  unstable_DataStrategyFunctionArgs,
+  unstable_DataStrategyMatch,
   Fetcher,
   FormEncType,
   FormMethod,
@@ -83,6 +86,9 @@ import {
 ////////////////////////////////////////////////////////////////////////////////
 
 export type {
+  unstable_DataStrategyFunction,
+  unstable_DataStrategyFunctionArgs,
+  unstable_DataStrategyMatch,
   FormEncType,
   FormMethod,
   GetScrollRestorationKeyFunction,
@@ -91,7 +97,7 @@ export type {
   URLSearchParamsInit,
   V7_FormMethod,
 };
-export { createSearchParams };
+export { createSearchParams, ErrorResponseImpl as UNSAFE_ErrorResponseImpl };
 
 // Note: Keep in sync with react-router exports!
 export type {
@@ -143,6 +149,7 @@ export type {
   ShouldRevalidateFunctionArgs,
   To,
   UIMatch,
+  unstable_HandlerResult,
 } from "react-router";
 export {
   AbortedDeferredError,
@@ -218,9 +225,26 @@ export {
 
 declare global {
   var __staticRouterHydrationData: HydrationState | undefined;
+  var __reactRouterVersion: string;
   interface Document {
     startViewTransition(cb: () => Promise<void> | void): ViewTransition;
   }
+}
+
+// HEY YOU! DON'T TOUCH THIS VARIABLE!
+//
+// It is replaced with the proper version at build time via a babel plugin in
+// the rollup config.
+//
+// Export a global property onto the window for React Router detection by the
+// Core Web Vitals Technology Report.  This way they can configure the `wappalyzer`
+// to detect and properly classify live websites as being built with React Router:
+// https://github.com/HTTPArchive/wappalyzer/blob/main/src/technologies/r.json
+const REACT_ROUTER_VERSION = "0";
+try {
+  window.__reactRouterVersion = REACT_ROUTER_VERSION;
+} catch (e) {
+  // no-op
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -231,6 +255,7 @@ interface DOMRouterOpts {
   basename?: string;
   future?: Partial<Omit<RouterFutureConfig, "v7_prependBasename">>;
   hydrationData?: HydrationState;
+  unstable_dataStrategy?: unstable_DataStrategyFunction;
   window?: Window;
 }
 
@@ -248,6 +273,7 @@ export function createBrowserRouter(
     hydrationData: opts?.hydrationData || parseHydrationData(),
     routes,
     mapRouteProperties,
+    unstable_dataStrategy: opts?.unstable_dataStrategy,
     window: opts?.window,
   }).initialize();
 }
@@ -266,6 +292,7 @@ export function createHashRouter(
     hydrationData: opts?.hydrationData || parseHydrationData(),
     routes,
     mapRouteProperties,
+    unstable_dataStrategy: opts?.unstable_dataStrategy,
     window: opts?.window,
   }).initialize();
 }
@@ -499,6 +526,7 @@ export function RouterProvider({
 
       let isViewTransitionUnavailable =
         router.window == null ||
+        router.window.document == null ||
         typeof router.window.document.startViewTransition !== "function";
 
       // If this isn't a view transition or it's not available in this browser,

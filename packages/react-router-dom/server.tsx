@@ -315,6 +315,7 @@ export function createStaticRouter(
         v7_partialHydration: opts.future?.v7_partialHydration === true,
         v7_prependBasename: false,
         v7_relativeSplatPath: opts.future?.v7_relativeSplatPath === true,
+        unstable_skipActionErrorRevalidation: false,
       };
     },
     get state() {
@@ -389,6 +390,10 @@ function createHref(to: To) {
 
 function encodeLocation(to: To): Path {
   let href = typeof to === "string" ? to : createPath(to);
+  // Treating this as a full URL will strip any trailing spaces so we need to
+  // pre-encode them since they might be part of a matching splat param from
+  // an ancestor route
+  href = href.replace(/ $/, "%20");
   let encoded = ABSOLUTE_URL_REGEX.test(href)
     ? new URL(href)
     : new URL(href, "http://localhost");
